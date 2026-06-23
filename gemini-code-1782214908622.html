@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time GPS Monitor Dashboard</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+        .monitor-card { background: #1e293b; border: 1px solid #334155; padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); width: 100%; max-width: 450px; }
+        h2 { text-align: center; color: #38bdf8; margin-top: 0; font-size: 1.5rem; letter-spacing: 0.5px; }
+        .data-group { margin: 15px 0; background: #111827; padding: 12px 16px; border-radius: 8px; border-left: 4px solid #38bdf8; }
+        .label { font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; }
+        .value { font-size: 1.25rem; font-weight: bold; color: #f8fafc; margin-top: 4px; }
+        .status-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 25px; padding-top: 15px; border-top: 1px solid #334155; font-size: 0.85rem; color: #64748b; }
+        .badge { background: #22c55e; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+        .timer-info { color: #fbbf24; }
+    </style>
+</head>
+<body>
+
+<div class="monitor-card">
+    <h2>📡 ตรวจรับสัญญาณพิกัด (Real-time)</h2>
+    
+    <div class="data-group">
+        <div class="label">Device Identifier (ID)</div>
+        <div id="deviceId" class="value">รอการเชื่อมต่อ...</div>
+    </div>
+    
+    <div class="data-group">
+        <div class="label">Latitude (ละติจูด)</div>
+        <div id="lat" class="value">-</div>
+    </div>
+    
+    <div class="data-group">
+        <div class="label">Longitude (ลองจิจูด)</div>
+        <div id="lon" class="value">-</div>
+    </div>
+
+    <div class="data-group">
+        <div class="label">Speed (ความเร็ว)</div>
+        <div id="speed" class="value">-</div>
+    </div>
+    
+    <div class="data-group">
+        <div class="label">เวลาที่อัปเดตล่าสุด</div>
+        <div id="time" class="value">-</div>
+    </div>
+    
+    <div class="status-bar">
+        <div>สถานะเซิร์ฟเวอร์: <span class="badge">ONLINE</span></div>
+        <div class="timer-info">ข้อมูลล่าสุดเมื่อ: <span id="seconds-ago">0</span> วินาทีที่แล้ว</div>
+    </div>
+</div>
+
+<script>
+    // เชื่อมต่อเข้ากับ Socket.io ของ Server (จะเชื่อมต่อกลับมาที่ host ตัวเองโดยอัตโนมัติ)
+    const socket = io();
+    
+    let lastUpdateTime = Date.now();
+
+    // เฝ้ารับเหตุการณ์ 'locationUpdate' ที่ส่งมาจาก server.js
+    socket.on('locationUpdate', (data) => {
+        // อัปเดตข้อมูลพิกัดลงหน้าจอทันทีเมื่อมีข้อมูล POST เข้ามาที่ Server
+        document.getElementById('deviceId').innerText = data.id;
+        document.getElementById('lat').innerText = data.lat;
+        document.getElementById('lon').innerText = data.lon;
+        document.getElementById('speed').innerText = data.speed + " km/h";
+        
+        // จัดรูปแบบเวลาแสดงผล
+        const dateObj = isNaN(data.timestamp) ? new Date(data.timestamp) : new Date(parseInt(data.timestamp));
+        document.getElementById('time').innerText = dateObj.toLocaleString('th-TH');
+        
+        // รีเซ็ตเวลานับถอยหลังตั้งแต่ข้อมูลล่าสุดเข้ามา
+        lastUpdateTime = Date.now();
+        document.getElementById('seconds-ago').innerText = "0";
+    });
+
+    // หน้าจอจะคำนวณและแสดงผลความเก่าของข้อมูลเพิ่มขึ้นทุกๆ 1 วินาที
+    setInterval(() => {
+        const diffSeconds = Math.floor((Date.now() - lastUpdateTime) / 1000);
+        document.getElementById('seconds-ago').innerText = diffSeconds;
+        
+        // เปลี่ยนสีตัวเลขนับเวลาเพื่อเตือน หากมือถือไม่ส่งข้อมูลมาเกิน 20 วินาทีตามที่ตั้งไว้
+        if (diffSeconds > 20) {
+            document.querySelector('.timer-info').style.color = '#ef4444'; // สีแดง เตือนว่าข้อมูลเริ่มค้างช้าแล้ว
+        } else {
+            document.querySelector('.timer-info').style.color = '#fbbf24'; // สีเหลืองส้มปกติ
+        }
+    }, 1000);
+</script>
+
+</body>
+</html>
